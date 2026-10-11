@@ -1924,9 +1924,6 @@ async function loadDashboardUserProfile() {
         const user =
             await response.json();
 
-
-
-
         /* =================================================
            NAME
         ================================================= */
@@ -2194,6 +2191,9 @@ async function loadDashboardProfile() {
         const user =
             await response.json();
 
+        if (typeof window.populateInquiryStudentDetails === "function") {
+            window.populateInquiryStudentDetails(user);
+        }
 
 
 
@@ -4897,8 +4897,31 @@ if (loginRequiredModal) {
 
 const contactInquiryForm = document.getElementById("contactInquiryForm");
 if (contactInquiryForm) {
+  const inquiryNameInput = contactInquiryForm.elements.namedItem("name");
+  const inquiryEmailInput = contactInquiryForm.elements.namedItem("email");
+  window.populateInquiryStudentDetails = function (profile = {}) {
+    let savedUser = {};
+    try {
+      savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    } catch (error) {
+      // Use the separately cached student details if the profile cache is invalid.
+    }
+    const studentName = profile.name || savedUser.name || localStorage.getItem("user_name") || "";
+    const studentEmail = profile.email || savedUser.email || localStorage.getItem("user_email") || "";
+    if (inquiryNameInput && studentName) inquiryNameInput.value = studentName;
+    if (inquiryEmailInput) {
+      if (studentEmail) inquiryEmailInput.value = studentEmail;
+      inquiryEmailInput.readOnly = Boolean(studentEmail);
+    }
+  };
+  window.populateInquiryStudentDetails();
+
   contactInquiryForm.addEventListener("submit", async function (event) {
     event.preventDefault();
+    if (!contactInquiryForm.checkValidity()) {
+      contactInquiryForm.reportValidity();
+      return;
+    }
     const submitButton = contactInquiryForm.querySelector(".contact-submit");
     const statusMessage = document.getElementById("contactFormStatus");
     const formData = Object.fromEntries(new FormData(contactInquiryForm).entries());
@@ -4929,9 +4952,10 @@ if (contactInquiryForm) {
       }
 
       contactInquiryForm.reset();
+      window.populateInquiryStudentDetails();
       if (statusMessage) {
         statusMessage.dataset.state = "success";
-        statusMessage.textContent = "Message sent. The administrator can now see it in the portal inbox.";
+        statusMessage.textContent = result.message || "Message sent. The administrator can now see it in the portal inbox.";
       }
     } catch (error) {
       if (statusMessage) {

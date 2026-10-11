@@ -110,6 +110,30 @@
     #recentResultsToggle[hidden]{display:none!important}
     #recentResultsBody .result-row:hover{background:rgba(37,99,235,.06)}
 
+    /* Dashboard support inquiry form */
+    .contact-inquiry-section{margin-top:24px}
+    .contact-inquiry-intro{max-width:760px;margin:8px 0 22px;color:var(--muted,#64748b);line-height:1.65}
+    .contact-inquiry-card{padding:24px;border:1px solid var(--border,#dfe6f1);border-radius:18px;background:var(--white,#fff)}
+    .contact-inquiry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .contact-inquiry-field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;color:var(--navy,#172b4d);font-size:13px;font-weight:700}
+    .contact-inquiry-field input,.contact-inquiry-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--border,#dfe6f1);border-radius:10px;background:#f8faff;color:var(--text,#172b4d);padding:12px 14px;font:inherit;font-weight:400}
+    .contact-inquiry-field input{min-height:46px}
+    .contact-inquiry-field input[readonly]{background:#eef3fc;color:#52627c}
+    .contact-inquiry-field textarea{min-height:132px;resize:vertical;line-height:1.55}
+    .contact-inquiry-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .contact-inquiry-status{min-height:20px;color:var(--muted,#64748b);font-size:13px;line-height:1.5}
+    .contact-inquiry-status[data-state="success"]{color:#16834e}
+    .contact-inquiry-status[data-state="error"]{color:#c4313b}
+    .contact-submit{border:0;border-radius:10px;background:#245fe8;color:#fff;padding:13px 20px;font:inherit;font-weight:800;cursor:pointer}
+    .contact-submit:disabled{opacity:.65;cursor:wait}
+    html[data-theme="dark"] .contact-inquiry-card{background:#0e1730;border-color:#26335c}
+    html[data-theme="dark"] .contact-inquiry-field{color:#e8eeff}
+    html[data-theme="dark"] .contact-inquiry-field input,html[data-theme="dark"] .contact-inquiry-field textarea{background:#0b1226;border-color:#33436b;color:#e8eeff}
+    html[data-theme="dark"] .contact-inquiry-field input[readonly]{background:#172344;color:#b6c4e4}
+    html[data-theme="dark"] .contact-inquiry-status[data-state="success"]{color:#72dfa6}
+    html[data-theme="dark"] .contact-inquiry-status[data-state="error"]{color:#ff9aa5}
+    @media (max-width:600px){.contact-inquiry-card{padding:18px}.contact-inquiry-grid{grid-template-columns:1fr;gap:0}.contact-inquiry-actions{align-items:stretch;flex-direction:column}.contact-submit{width:100%}}
+
     /* progress ring + chart */
     .progress-circle{transition:transform .4s}.progress-circle:hover{transform:scale(1.04)}
     .progress-circle > div{background:var(--white)}
@@ -827,6 +851,41 @@
 
 
       
+    </section>
+
+    <section class="dashboard-section contact-inquiry-section" id="contact-admin">
+      <div class="card-header">
+        <div>
+          <span class="small-heading">WE'RE HERE TO HELP</span>
+          <h3>Ask the administrator</h3>
+        </div>
+      </div>
+      <p class="contact-inquiry-intro">Your message will appear in the admin portal inbox. The administrator can reply to the email address on your student account.</p>
+      <div class="contact-inquiry-card">
+        <form id="contactInquiryForm" novalidate>
+          <div class="contact-inquiry-grid">
+            <label class="contact-inquiry-field">Your name
+              <input type="text" name="name" autocomplete="name" required minlength="2" maxlength="100">
+            </label>
+            <label class="contact-inquiry-field">Email address
+              <input type="email" name="email" autocomplete="email" required maxlength="150">
+            </label>
+          </div>
+          <label class="contact-inquiry-field">Subject
+            <input type="text" name="subject" required minlength="3" maxlength="160">
+          </label>
+          <label class="contact-inquiry-field">Your message
+            <textarea name="message" required minlength="10" maxlength="4000"></textarea>
+          </label>
+          <label class="contact-inquiry-honeypot" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+            Website <input type="text" name="website" tabindex="-1" autocomplete="off">
+          </label>
+          <div class="contact-inquiry-actions">
+            <span class="contact-inquiry-status" id="contactFormStatus" role="status" aria-live="polite"></span>
+            <button type="submit" class="contact-submit">Send message <span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+      </div>
     </section>
 
   </main>
