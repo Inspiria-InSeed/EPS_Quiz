@@ -12,7 +12,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from email_validator import EmailNotValidError, validate_email
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -248,11 +248,13 @@ def register(
         window_seconds=3600,
     )
 
-    existing_user = db.scalar(select(User).where(User.email == normalized_email))
+    existing_user = db.scalar(
+        select(User).where(func.lower(User.email) == normalized_email)
+    )
     if existing_user and existing_user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="This email is already registered. Please log in with your email and password."
         )
 
     normalized_email = _validate_registration_email(normalized_email)
@@ -435,7 +437,7 @@ def verify_registration_otp(
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered. Please log in.",
+                detail="This email is already registered. Please log in with your email and password.",
             ) from exc
 
         token = create_access_token(
