@@ -1488,19 +1488,25 @@ if (!savedQuestion) {
       questions.forEach(
         function (question, index) {
 
+          const questionNumber = index + 1;
+          question.dataset.questionId = String(questionNumber);
+
           question.querySelector(
             ".admin-question-number"
           ).textContent =
-            `QUESTION ${index + 1}`;
+            `QUESTION ${questionNumber}`;
 
 
           question.querySelector(
             "h3"
           ).textContent =
-            `Question ${index + 1}`;
+            `Question ${questionNumber}`;
 
         }
       );
+
+      // Keep the next question added in sequence after any deletion.
+      questionCount = questions.length;
 
 
       if (questions.length === 0) {

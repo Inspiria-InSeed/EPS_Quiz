@@ -232,6 +232,7 @@ button {
     background: transparent;
     font-size: 21px;
     position: relative;
+    cursor: pointer;
 }
 
 .notification-dot {
@@ -990,6 +991,13 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
     align-items: stretch;
+}
+
+#settings .settings-grid > .settings-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: min(100%, calc((100% - 18px) / 2));
+    justify-self: center;
+    box-sizing: border-box;
 }
 
 .settings-card {
@@ -1795,6 +1803,11 @@ td {
     /* SETTINGS */
 .settings-grid {
     grid-template-columns: 1fr;
+}
+
+#settings .settings-grid > .settings-card:last-child:nth-child(odd) {
+    grid-column: auto;
+    width: auto;
 }
 
 .settings-card {

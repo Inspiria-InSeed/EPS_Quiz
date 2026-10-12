@@ -12,6 +12,8 @@
     >
 
     <title>EPS TOPIK - Quiz Settings</title>
+    <meta http-equiv="refresh" content="0; url=admin.html#settings">
+    <script>window.location.replace("admin.html#settings");</script>
 
     <link
         rel="stylesheet"
@@ -233,17 +235,22 @@
             <div class="topbar-right">
 
 
-                <button
-                    type="button"
-                    class="notification-btn"
-                    title="Notifications"
-                >
-
-                    ♢
-
-                    <span class="notification-dot"></span>
-
-                </button>
+                <div class="admin-notification-wrap">
+                    <button class="notification-btn" id="adminNotificationsButton" type="button" title="Set requests" aria-label="Set purchase requests" aria-expanded="false" aria-controls="adminNotificationsPanel">
+                        ♢
+                        <span class="notification-dot" id="adminNotificationsDot" hidden></span>
+                        <span class="notification-count" id="adminNotificationsCount" hidden></span>
+                    </button>
+                    <section class="admin-notifications-panel" id="adminNotificationsPanel" hidden aria-label="Pending set requests">
+                        <div class="admin-notifications-heading">
+                            <strong>Set purchase requests</strong>
+                            <button type="button" id="refreshAdminNotifications">Refresh</button>
+                        </div>
+                        <div id="adminNotificationsList" class="admin-notifications-list">
+                            <p class="admin-notifications-empty">Loading requests…</p>
+                        </div>
+                    </section>
+                </div>
 
 
                 <div class="top-profile">
