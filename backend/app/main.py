@@ -91,6 +91,8 @@ from app.admin_portal.routes.support_inquiries import (
 
 from app.routes.student_exams import router as student_exams_router
 from app.routes.student_dashboard import router as student_dashboard_router
+from app.routes.site_settings import admin_router as admin_site_settings_router
+from app.routes.site_settings import public_router as site_settings_router
 
 
 
@@ -163,6 +165,8 @@ def create_app():
     app.include_router(admin_student_access_router)
     app.include_router(contact_router)
     app.include_router(admin_inquiries_router)
+    app.include_router(site_settings_router)
+    app.include_router(admin_site_settings_router)
 
     # Student
     app.include_router(student_exams_router)

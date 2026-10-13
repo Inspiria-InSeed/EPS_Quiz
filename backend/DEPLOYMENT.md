@@ -54,6 +54,12 @@ to the same database. It removes the per-student/set uniqueness constraint and
 adds an index for querying that history; existing request and decision rows are
 preserved.
 
+For the administrator-controlled site-wide light/dark theme, apply
+[`migrations/2026_10_platform_theme_settings.sql`](migrations/2026_10_platform_theme_settings.sql)
+to the production database before deploying the theme API. The migration creates
+one shared setting initialized to light mode. Admin changes then apply to student
+and admin pages; already-open pages refresh the setting every 30 seconds.
+
 For student profile photo uploads, apply
 [`migrations/2026_10_student_profile_photo.sql`](migrations/2026_10_student_profile_photo.sql)
 before deploying the profile API changes. Profile images use the existing private

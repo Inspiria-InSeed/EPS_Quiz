@@ -1,5 +1,7 @@
 (function () {
   const storageKey = "eps-topik-theme";
+  const apiBase = window.API_BASE_URL || "/backend";
+  let globalTheme = null;
   let savedTheme = "light";
   try {
     savedTheme = localStorage.getItem(storageKey) || localStorage.getItem("eps_theme") || "light";
@@ -12,6 +14,60 @@
   const initialTheme = savedTheme === "dark" ? "dark" : "light";
 
   document.documentElement.dataset.theme = initialTheme;
+
+  function applyTheme(theme, managed) {
+    const nextTheme = theme === "dark" ? "dark" : "light";
+    const changed = document.documentElement.dataset.theme !== nextTheme;
+    globalTheme = managed ? nextTheme : globalTheme;
+    document.documentElement.dataset.theme = nextTheme;
+    try {
+      localStorage.setItem(storageKey, nextTheme);
+      localStorage.setItem("eps_theme", nextTheme);
+    } catch (error) {
+      // The current page still changes theme if browser storage is disabled.
+    }
+    if (changed) refreshThemeContrast();
+    document.querySelectorAll("[data-theme-toggle]").forEach(syncThemeButton);
+    window.dispatchEvent(new CustomEvent("eps-site-theme-changed", {
+      detail: { theme: nextTheme, managed: Boolean(managed) }
+    }));
+  }
+
+  async function loadGlobalTheme() {
+    try {
+      const response = await fetch(`${apiBase}/site/theme`, {
+        credentials: "include",
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.theme === "dark" || data.theme === "light") {
+        applyTheme(data.theme, true);
+      }
+    } catch (error) {
+      // Keep the last local theme if the settings service is unavailable.
+    }
+  }
+
+  window.EPSGlobalTheme = {
+    apply: function (theme) { applyTheme(theme, true); },
+    isManaged: function () { return globalTheme !== null; },
+    get: function () { return globalTheme || document.documentElement.dataset.theme; },
+    refresh: loadGlobalTheme
+  };
+
+  // The landing page also has a local theme button. Once the administrator's
+  // shared setting is available, ignore local attempts to override it.
+  document.addEventListener("click", function (event) {
+    if (globalTheme === null || !event.target.closest?.("#themeToggle")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  // Load the administrator's site-wide setting, then keep already-open pages
+  // synchronized when the administrator changes it.
+  loadGlobalTheme();
+  window.setInterval(loadGlobalTheme, 30000);
 
   function colorParts(value) {
     const parts = value.match(/[\d.]+/g);
@@ -133,6 +189,11 @@
   window.addEventListener("storage", function (event) {
     if (event.key !== storageKey && event.key !== "eps_theme") return;
 
+    // The database value is authoritative after it has been loaded. Cross-tab
+    // localStorage events must not temporarily override the administrator's
+    // shared selection.
+    if (globalTheme !== null) return;
+
     document.documentElement.dataset.theme =
       event.newValue === "dark" ? "dark" : "light";
     if (event.key === "eps_theme") {
@@ -146,6 +207,7 @@
     document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
       syncThemeButton(button);
       button.addEventListener("click", function () {
+        if (globalTheme !== null) return;
         const nextTheme =
           document.documentElement.dataset.theme === "dark" ? "light" : "dark";
         document.documentElement.dataset.theme = nextTheme;

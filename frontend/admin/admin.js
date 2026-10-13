@@ -174,6 +174,52 @@ document.addEventListener("DOMContentLoaded", () => {
     const paymentHistoryEmpty = document.getElementById("paymentsEmpty");
     const paymentHistoryFeedback = document.getElementById("paymentHistoryFeedback");
     const refreshPaymentHistory = document.getElementById("refreshPaymentHistory");
+    const globalSiteThemeToggle = document.getElementById("globalSiteThemeToggle");
+    const globalSiteThemeStatus = document.getElementById("globalSiteThemeStatus");
+
+    function renderGlobalSiteTheme(theme) {
+        const isDark = theme === "dark";
+        if (globalSiteThemeToggle) {
+            globalSiteThemeToggle.setAttribute("aria-pressed", String(isDark));
+            globalSiteThemeToggle.textContent = isDark
+                ? "Switch whole site to light mode"
+                : "Switch whole site to dark mode";
+        }
+        if (globalSiteThemeStatus) {
+            globalSiteThemeStatus.textContent = isDark
+                ? "Dark mode is active for students and administrators."
+                : "Light mode is active for students and administrators.";
+        }
+    }
+
+    renderGlobalSiteTheme(window.EPSGlobalTheme?.get());
+    window.addEventListener("eps-site-theme-changed", (event) => {
+        renderGlobalSiteTheme(event.detail?.theme);
+    });
+
+    globalSiteThemeToggle?.addEventListener("click", async () => {
+        const currentTheme = window.EPSGlobalTheme?.get() || "light";
+        const nextTheme = currentTheme === "dark" ? "light" : "dark";
+        globalSiteThemeToggle.disabled = true;
+        if (globalSiteThemeStatus) globalSiteThemeStatus.textContent = "Updating site appearance…";
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin/site/theme`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ theme: nextTheme })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || "Could not update the site appearance.");
+            window.EPSGlobalTheme?.apply(data.theme);
+            renderGlobalSiteTheme(data.theme);
+        } catch (error) {
+            if (globalSiteThemeStatus) {
+                globalSiteThemeStatus.textContent = error.message || "Could not update the site appearance.";
+            }
+        } finally {
+            globalSiteThemeToggle.disabled = false;
+        }
+    });
 
     const notificationsButton = document.getElementById("adminNotificationsButton");
     const notificationsPanel = document.getElementById("adminNotificationsPanel");
