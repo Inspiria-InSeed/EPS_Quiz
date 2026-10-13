@@ -229,6 +229,36 @@ button {
   border-radius: 0 0 8px 8px;
 }
 
+.exam-connection-status {
+  margin: 12px auto 0;
+  max-width: 1050px;
+  width: calc(100% - 8%);
+  padding: 10px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 14px;
+}
+
+.exam-connection-status.is-error {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+html[data-theme="dark"] .exam-connection-status {
+  border-color: #166534;
+  background: #052e24;
+  color: #bbf7d0;
+}
+
+html[data-theme="dark"] .exam-connection-status.is-error {
+  border-color: #854d0e;
+  background: #422006;
+  color: #fde68a;
+}
+
 
 /* =====================================================
    MAIN EXAM

@@ -3174,8 +3174,134 @@ let examExpiresAt = null;
 let examTimerInterval = null;
 let examTimerSyncInterval = null;
 let timerStatusAbortController = null;
+let activeExamCheckpointKey = null;
+let pendingExamAnswers = {};
+let answerAutosaveTimer = null;
+let answerAutosaveInProgress = false;
 
 const COMPLETED_EXAM_ROUTE_KEY = "completed_exam_route";
+const EXAM_CHECKPOINT_PREFIX = "student_exam_checkpoint:";
+
+function getExamCheckpointKey(examId, setId) {
+    const userKey = (localStorage.getItem("user_email") || "student").trim().toLowerCase();
+    return `${EXAM_CHECKPOINT_PREFIX}${userKey}:${String(examId)}:${String(setId)}`;
+}
+
+function readExamCheckpoint(examId, setId) {
+    try {
+        const raw = localStorage.getItem(getExamCheckpointKey(examId, setId));
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.warn("Could not read saved exam progress:", error);
+        return null;
+    }
+}
+
+function saveExamCheckpoint() {
+    if (!activeExamCheckpointKey || !studentAttemptId || !studentExamQuestions.length) return;
+    try {
+        const params = new URLSearchParams(window.location.search);
+        localStorage.setItem(activeExamCheckpointKey, JSON.stringify({
+            attemptId: String(studentAttemptId),
+            examId: params.get("exam"),
+            setId: params.get("set"),
+            expiresAt: examExpiresAt,
+            questions: studentExamQuestions,
+            selectedAnswers,
+            pendingAnswers: pendingExamAnswers,
+            currentQuestionIndex: currentExamQuestionIndex,
+            updatedAt: Date.now()
+        }));
+    } catch (error) {
+        console.warn("Could not save exam progress on this device:", error);
+    }
+}
+
+function showExamConnectionStatus(message, isError = false) {
+    const status = document.getElementById("examConnectionStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("is-error", isError);
+    status.hidden = !message;
+}
+
+async function flushPendingExamAnswers() {
+    if (answerAutosaveInProgress || !studentAttemptId || !navigator.onLine) return;
+    const token = localStorage.getItem("access_token");
+    const entries = Object.entries(pendingExamAnswers);
+    if (!token || entries.length === 0) return;
+
+    answerAutosaveInProgress = true;
+    let retryTransientFailure = false;
+    let hasNewerPendingAnswer = false;
+    try {
+        const response = await fetch(
+            `${window.EPS_API?.baseUrl || window.API_BASE_URL}/api/attempts/${encodeURIComponent(studentAttemptId)}/answers/batch`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    answers: entries.map(([questionId, optionId]) => ({
+                        question_id: String(questionId),
+                        selected_option_id: String(optionId)
+                    }))
+                })
+            }
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            retryTransientFailure = response.status === 429 || response.status >= 500;
+            throw new Error(result.detail || `Answer save failed (${response.status}).`);
+        }
+
+        entries.forEach(([questionId, optionId]) => {
+            if (String(pendingExamAnswers[questionId]) === String(optionId)) {
+                delete pendingExamAnswers[questionId];
+            }
+        });
+        hasNewerPendingAnswer = Object.entries(pendingExamAnswers).some(
+            ([questionId, optionId]) => !entries.some(
+                ([savedQuestionId, savedOptionId]) =>
+                    savedQuestionId === questionId && String(savedOptionId) === String(optionId)
+            )
+        );
+        saveExamCheckpoint();
+        if (navigator.onLine) showExamConnectionStatus("");
+    } catch (error) {
+        // Keep answers in the local queue and retry when the connection returns.
+        console.warn("Exam answers are waiting to sync:", error);
+        showExamConnectionStatus("Some answers are saved on this device and are waiting to sync.", true);
+        retryTransientFailure = retryTransientFailure || error instanceof TypeError;
+    } finally {
+        answerAutosaveInProgress = false;
+        if ((retryTransientFailure || hasNewerPendingAnswer) && Object.keys(pendingExamAnswers).length && navigator.onLine) {
+            clearTimeout(answerAutosaveTimer);
+            answerAutosaveTimer = setTimeout(flushPendingExamAnswers, hasNewerPendingAnswer ? 300 : 3000);
+        }
+    }
+}
+
+function queueExamAnswerSave(questionId, optionId) {
+    pendingExamAnswers[String(questionId)] = String(optionId);
+    saveExamCheckpoint();
+    clearTimeout(answerAutosaveTimer);
+    answerAutosaveTimer = setTimeout(flushPendingExamAnswers, 300);
+}
+
+window.addEventListener("offline", () => {
+    showExamConnectionStatus("Connection lost. Your answers are saved on this device and will sync when you reconnect.", true);
+});
+window.addEventListener("online", () => {
+    const hasPendingAnswers = Object.keys(pendingExamAnswers).length > 0;
+    showExamConnectionStatus(hasPendingAnswers ? "Connection restored. Syncing your answers…" : "Connection restored.");
+    flushPendingExamAnswers().finally(() => refreshBackendExamTimer());
+    if (!hasPendingAnswers) {
+        setTimeout(() => showExamConnectionStatus(""), 2500);
+    }
+});
 
 function markCurrentExamCompleted() {
     const params = new URLSearchParams(window.location.search);
@@ -3455,6 +3581,8 @@ async function loadStudentExamQuestions() {
 
 const examId = params.get("exam");
 const setId = params.get("set");
+activeExamCheckpointKey = getExamCheckpointKey(examId, setId);
+const cachedCheckpoint = readExamCheckpoint(examId, setId);
 const actualSetNumber = params.get("set_number") || setId;
 const setNumberElement =
     document.getElementById("setNumber");
@@ -3709,11 +3837,76 @@ if (Number.isFinite(questionCount)) {
             );
         }
 
-        currentExamQuestionIndex = 0;
+        const matchingCheckpoint = cachedCheckpoint &&
+            String(cachedCheckpoint.attemptId) === String(studentAttemptId)
+            ? cachedCheckpoint
+            : null;
+        selectedAnswers = { ...(matchingCheckpoint?.selectedAnswers || {}) };
+        pendingExamAnswers = { ...(matchingCheckpoint?.pendingAnswers || {}) };
 
+        // Answers already synced are fetched from the active attempt. Locally
+        // queued answers take precedence in case connectivity dropped before
+        // the server acknowledged the latest choice.
+        try {
+            const answerResponse = await fetch(
+                `${apiBase}/api/attempts/${encodeURIComponent(studentAttemptId)}/answers`,
+                { headers: { "Authorization": `Bearer ${token}` } }
+            );
+            const answerData = await answerResponse.json().catch(() => ({}));
+            if (answerResponse.ok && Array.isArray(answerData.answers)) {
+                answerData.answers.forEach((answer) => {
+                    selectedAnswers[String(answer.question_id)] = String(answer.selected_option_id);
+                });
+            }
+        } catch (error) {
+            console.warn("Could not load saved answers; restoring any device checkpoint instead.", error);
+        }
+
+        if (matchingCheckpoint) {
+            Object.assign(selectedAnswers, matchingCheckpoint.pendingAnswers || {});
+            const restoredIndex = Number(matchingCheckpoint.currentQuestionIndex);
+            currentExamQuestionIndex = Number.isInteger(restoredIndex)
+                ? Math.min(Math.max(restoredIndex, 0), studentExamQuestions.length - 1)
+                : 0;
+        } else {
+            currentExamQuestionIndex = 0;
+        }
+
+        saveExamCheckpoint();
         renderStudentExamQuestion();
+        if (Object.keys(pendingExamAnswers).length) flushPendingExamAnswers();
+        if (!navigator.onLine) {
+            showExamConnectionStatus("Offline mode. Your current question and answers are saved on this device and will sync when you reconnect.", true);
+        }
 
     } catch (error) {
+
+        const expiresAt = Number(cachedCheckpoint?.expiresAt || 0);
+        const expiryMilliseconds = expiresAt > 1e12 ? expiresAt : expiresAt * 1000;
+        const cachedQuestions = Array.isArray(cachedCheckpoint?.questions)
+            ? cachedCheckpoint.questions
+            : [];
+        if (
+            (error instanceof TypeError || error.status >= 500 || /failed to fetch|networkerror/i.test(error.message || "")) &&
+            cachedCheckpoint?.attemptId &&
+            cachedQuestions.length &&
+            expiryMilliseconds > Date.now()
+        ) {
+            studentAttemptId = String(cachedCheckpoint.attemptId);
+            examExpiresAt = expiresAt;
+            studentExamQuestions = cachedQuestions;
+            selectedAnswers = { ...(cachedCheckpoint.selectedAnswers || {}) };
+            pendingExamAnswers = { ...(cachedCheckpoint.pendingAnswers || {}) };
+            const restoredIndex = Number(cachedCheckpoint.currentQuestionIndex);
+            currentExamQuestionIndex = Number.isInteger(restoredIndex)
+                ? Math.min(Math.max(restoredIndex, 0), studentExamQuestions.length - 1)
+                : 0;
+            startBackendExamTimer();
+            renderStudentExamQuestion();
+            showExamConnectionStatus("Connection lost. Resumed from this device; your answers will sync when you reconnect.", true);
+            if (navigator.onLine && Object.keys(pendingExamAnswers).length) flushPendingExamAnswers();
+            return;
+        }
 
         console.error(
             "Failed to start/load exam:",
@@ -3903,6 +4096,8 @@ function renderStudentExamQuestion() {
     if (!question) {
         return;
     }
+
+    saveExamCheckpoint();
 
     if (activeExamAudioElement && activeExamAudioQuestionId !== String(question.id)) {
         activeExamAudioElement.pause();
@@ -4244,6 +4439,8 @@ function renderStudentExamOptions(question) {
                     selectedAnswers[
                         question.id
                     ] = option.id;
+
+                    queueExamAnswerSave(question.id, option.id);
 
                     renderStudentExamQuestion();
                 }

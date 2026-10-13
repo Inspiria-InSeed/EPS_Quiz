@@ -272,6 +272,43 @@ def get_attempt_questions(
     )
 
 
+@router.get("/{attempt_id}/answers")
+def get_attempt_saved_answers(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """Return the signed-in student's saved answers for an active attempt."""
+    prefix, separator, raw_id = attempt_id.partition("_")
+    if prefix != "attempt" or not separator or not raw_id.isdecimal():
+        raise HTTPException(status_code=404, detail="Attempt not found.")
+
+    session = db.get(ExamSessionModel, int(raw_id))
+    if session is None:
+        raise HTTPException(status_code=404, detail="Attempt not found.")
+    if session.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="You cannot access this attempt.")
+    if session.status != "IN_PROGRESS":
+        raise HTTPException(status_code=409, detail="Attempt is no longer active.")
+
+    answers = db.scalars(
+        select(StudentAnswerModel).where(
+            StudentAnswerModel.attempt_id == session.id
+        )
+    ).all()
+    return {
+        "attempt_id": attempt_id,
+        "answers": [
+            {
+                "question_id": str(answer.question_id),
+                "selected_option_id": str(answer.selected_option_id),
+            }
+            for answer in answers
+            if answer.selected_option_id is not None
+        ],
+    }
+
+
 # ============================================================
 # SAVE ANSWER
 # ============================================================
