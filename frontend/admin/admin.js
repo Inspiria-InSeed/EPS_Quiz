@@ -193,11 +193,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadPaymentHistory() {
         if (!paymentHistoryBody) return;
-        const adminToken = localStorage.getItem("admin_access_token");
-        if (!adminToken) {
-            if (paymentHistoryFeedback) paymentHistoryFeedback.textContent = "Sign in again to view purchase history.";
-            return;
-        }
 
         if (paymentHistoryFeedback) paymentHistoryFeedback.textContent = "Loading set request history…";
         if (paymentHistoryEmpty) paymentHistoryEmpty.hidden = true;
@@ -205,9 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (refreshPaymentHistory) refreshPaymentHistory.disabled = true;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/admin/student-access/requests/history`, {
-                headers: { Authorization: `Bearer ${adminToken}` }
-            });
+            const response = await fetch(`${API_BASE_URL}/admin/student-access/requests/history`);
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.detail || "Could not load set request history.");
 
@@ -255,16 +248,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadSetRequestNotifications() {
         if (!notificationsList) return;
-        const adminToken = localStorage.getItem("admin_access_token");
-        if (!adminToken) {
-            notificationsList.innerHTML = '<p class="admin-notifications-empty">Sign in again to view set requests.</p>';
-            return;
-        }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/admin/student-access/requests`, {
-                headers: { Authorization: `Bearer ${adminToken}` }
-            });
+            const response = await fetch(`${API_BASE_URL}/admin/student-access/requests`);
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.detail || "Could not load set requests.");
             const requests = Array.isArray(data.requests) ? data.requests : [];
@@ -318,8 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const response = await fetch(
                     `${API_BASE_URL}/admin/student-access/requests/${encodeURIComponent(requestId)}/${action}`,
                     {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${localStorage.getItem("admin_access_token")}` }
+                        method: "POST"
                     }
                 );
                 const data = await response.json().catch(() => ({}));
