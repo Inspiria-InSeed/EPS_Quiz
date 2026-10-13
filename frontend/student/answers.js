@@ -2,6 +2,13 @@ document.addEventListener(
     "DOMContentLoaded",
     async function () {
 
+        // A completed attempt is a terminal page in this navigation flow.
+        // Browser Back from results returns the student to the dashboard.
+        history.pushState({ completedResultGuard: true }, "", window.location.href);
+        window.addEventListener("popstate", function () {
+            window.location.replace("dashboard.html");
+        }, { once: true });
+
 
 
 
@@ -922,35 +929,9 @@ document.addEventListener(
 
         window.retakeTest =
             function () {
-
-                const examId =
-                    localStorage.getItem(
-                        "last_exam_id"
-                    );
-
-
-                const setId =
-                    localStorage.getItem(
-                        "last_set_id"
-                    );
-
-
-                if (
-                    examId &&
-                    setId
-                ) {
-
-                    window.location.href =
-                        `exam.html?exam=${encodeURIComponent(examId)}` +
-                        `&set=${encodeURIComponent(setId)}`;
-
-                    return;
-
-                }
-
-
-                window.location.href =
-                    "set.html";
+                // Start a fresh attempt from the dashboard so access and the
+                // completed-attempt guard are checked through the normal flow.
+                window.location.replace("dashboard.html#tests");
 
             };
 
@@ -962,8 +943,9 @@ document.addEventListener(
         window.goToDashboard =
             function () {
 
-                window.location.href =
-                    "dashboard.html";
+                window.location.replace(
+                    "dashboard.html"
+                );
 
             };
 

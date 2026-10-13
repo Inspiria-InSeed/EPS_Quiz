@@ -1,5 +1,12 @@
 document.addEventListener("DOMContentLoaded", async function () {
 
+    // Returning from answer review should end at the dashboard rather than
+    // reopening the exam or the result page in the browser history.
+    history.pushState({ completedReviewGuard: true }, "", window.location.href);
+    window.addEventListener("popstate", function () {
+        window.location.replace("dashboard.html");
+    }, { once: true });
+
     // ============================================================
     // ELEMENTS
     // ============================================================
@@ -1035,8 +1042,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             "click",
             function () {
 
-                window.location.href =
-                    "answers.html";
+                window.location.replace(
+                    "dashboard.html"
+                );
 
             }
         );
@@ -1052,8 +1060,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     dashboardButton.addEventListener(
         "click",
         function () {
-            window.location.href =
-                "dashboard.html";
+            window.location.replace(
+                "dashboard.html"
+            );
         }
     );
 }

@@ -1664,6 +1664,10 @@ function startTest(setId, examId) {
         return;
     }
 
+    // A student may start a new attempt only by choosing the set again from
+    // the dashboard, which clears the completed-attempt navigation guard.
+    sessionStorage.removeItem("completed_exam_route");
+
     window.location.href =
         `exam.html?exam=${encodeURIComponent(examId)}&set=${encodeURIComponent(setId)}`;
 }
@@ -3171,6 +3175,47 @@ let examTimerInterval = null;
 let examTimerSyncInterval = null;
 let timerStatusAbortController = null;
 
+const COMPLETED_EXAM_ROUTE_KEY = "completed_exam_route";
+
+function markCurrentExamCompleted() {
+    const params = new URLSearchParams(window.location.search);
+    const examId = params.get("exam");
+    const setId = params.get("set");
+    if (examId && setId) {
+        sessionStorage.setItem(
+            COMPLETED_EXAM_ROUTE_KEY,
+            JSON.stringify({ examId: String(examId), setId: String(setId) })
+        );
+    }
+}
+
+function redirectCompletedExamToDashboard() {
+    const optionsContainer = document.getElementById("options");
+    if (!optionsContainer) return false;
+
+    const params = new URLSearchParams(window.location.search);
+    const examId = params.get("exam");
+    const setId = params.get("set");
+    let completedRoute;
+    try {
+        completedRoute = JSON.parse(sessionStorage.getItem(COMPLETED_EXAM_ROUTE_KEY) || "null");
+    } catch (_) {
+        completedRoute = null;
+    }
+
+    if (
+        completedRoute &&
+        String(completedRoute.examId) === String(examId) &&
+        String(completedRoute.setId) === String(setId)
+    ) {
+        window.location.replace("dashboard.html");
+        return true;
+    }
+    return false;
+}
+
+window.addEventListener("pageshow", redirectCompletedExamToDashboard);
+
 function updateExamStats() {
     const solvedElement = document.getElementById("solved");
     const unsolvedElement = document.getElementById("unsolved");
@@ -3403,6 +3448,8 @@ async function loadStudentExamQuestions() {
     if (!optionsContainer) {
         return;
     }
+
+    if (redirectCompletedExamToDashboard()) return;
 
     const params = new URLSearchParams(window.location.search);
 
@@ -4436,6 +4483,7 @@ if (answersToSave.length) {
 
 
         const submittedAttemptId = studentAttemptId;
+        markCurrentExamCompleted();
         localStorage.setItem("last_attempt_id", submittedAttemptId);
         studentAttemptId = null;
 
@@ -4498,7 +4546,7 @@ if (answersToSave.length) {
         } catch (resultError) {
             console.error("Exam was submitted, but result loading failed:", resultError);
             // Answers page retries the result request and retains the attempt ID.
-            window.location.href = "answers.html";
+            window.location.replace("answers.html");
             return;
         }
 
@@ -4531,7 +4579,7 @@ if (answersToSave.length) {
            OPEN RESULT / REVIEW PAGE
            ===================================================== */
 
-        window.location.href = "answers.html";
+        window.location.replace("answers.html");
 
 
         /* =====================================================
