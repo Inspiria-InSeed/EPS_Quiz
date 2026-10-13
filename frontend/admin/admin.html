@@ -524,19 +524,22 @@
 
     <div class="section-header">
         <div>
-            <h2>Payments</h2>
-            <p>Manage and monitor payment activity.</p>
+            <h2>Payment History</h2>
+            <p>Review student set requests and admin decisions.</p>
         </div>
+        <button type="button" class="table-action" id="refreshPaymentHistory">Refresh history</button>
     </div>
 
     <div class="panel payments-panel">
 
         <div class="panel-header">
             <div>
-                <h3>Payment Transactions</h3>
-                <p>Payment information will appear here.</p>
+                <h3>Set Purchase Requests</h3>
+                <p>See which student requested each set and whether it was approved or rejected.</p>
             </div>
         </div>
+
+        <p class="payment-history-feedback" id="paymentHistoryFeedback" role="status" aria-live="polite"></p>
 
         <div class="table-container">
 
@@ -544,11 +547,13 @@
 
                 <thead>
                     <tr>
-                        <th>USER</th>
-                        <th>AMOUNT</th>
+                        <th>STUDENT</th>
+                        <th>EMAIL</th>
+                        <th>EXAM / SET</th>
+                        <th>REQUESTED</th>
                         <th>STATUS</th>
-                        <th>DATE</th>
-                        <th>ACTIONS</th>
+                        <th>REVIEWED</th>
+                        <th>REVIEWED BY</th>
                     </tr>
                 </thead>
 
@@ -563,10 +568,11 @@
         <div
             class="payments-empty"
             id="paymentsEmpty"
+            hidden
         >
             <div class="empty-icon">₹</div>
-            <h3>No payment data available</h3>
-            <p>Payment transactions will appear here when available.</p>
+            <h3>No set requests yet</h3>
+            <p>Student purchase requests and their decisions will appear here.</p>
         </div>
 
     </div>

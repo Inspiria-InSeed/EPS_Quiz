@@ -170,12 +170,88 @@ document.addEventListener("DOMContentLoaded", () => {
     const adminInquiriesList = document.getElementById("adminInquiriesList");
     const inquiriesFeedback = document.getElementById("inquiriesFeedback");
     const newInquiryCount = document.getElementById("newInquiryCount");
+    const paymentHistoryBody = document.getElementById("paymentsTableBody");
+    const paymentHistoryEmpty = document.getElementById("paymentsEmpty");
+    const paymentHistoryFeedback = document.getElementById("paymentHistoryFeedback");
+    const refreshPaymentHistory = document.getElementById("refreshPaymentHistory");
 
     const notificationsButton = document.getElementById("adminNotificationsButton");
     const notificationsPanel = document.getElementById("adminNotificationsPanel");
     const notificationsList = document.getElementById("adminNotificationsList");
     const notificationsDot = document.getElementById("adminNotificationsDot");
     const notificationsCount = document.getElementById("adminNotificationsCount");
+
+    function formatPaymentHistoryDate(value) {
+        if (!value) return "—";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "—";
+        return date.toLocaleString(undefined, {
+            year: "numeric", month: "short", day: "numeric",
+            hour: "numeric", minute: "2-digit"
+        });
+    }
+
+    async function loadPaymentHistory() {
+        if (!paymentHistoryBody) return;
+        const adminToken = localStorage.getItem("admin_access_token");
+        if (!adminToken) {
+            if (paymentHistoryFeedback) paymentHistoryFeedback.textContent = "Sign in again to view purchase history.";
+            return;
+        }
+
+        if (paymentHistoryFeedback) paymentHistoryFeedback.textContent = "Loading set request history…";
+        if (paymentHistoryEmpty) paymentHistoryEmpty.hidden = true;
+        paymentHistoryBody.innerHTML = "";
+        if (refreshPaymentHistory) refreshPaymentHistory.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin/student-access/requests/history`, {
+                headers: { Authorization: `Bearer ${adminToken}` }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || "Could not load set request history.");
+
+            const requests = Array.isArray(data.requests) ? data.requests : [];
+            if (paymentHistoryFeedback) {
+                paymentHistoryFeedback.textContent = requests.length
+                    ? `${requests.length} set request${requests.length === 1 ? "" : "s"} found.`
+                    : "";
+            }
+            if (!requests.length) {
+                if (paymentHistoryEmpty) paymentHistoryEmpty.hidden = false;
+                return;
+            }
+
+            paymentHistoryBody.innerHTML = requests.map((request) => {
+                const status = String(request.status || "Pending");
+                const statusClass = status.toLowerCase() === "approved"
+                    ? "approved"
+                    : status.toLowerCase() === "rejected" ? "rejected" : "pending";
+                const examSet = `${request.exam_title || "Exam"} · Set ${request.set_number ?? "—"}${request.exam_set_title ? ` — ${request.exam_set_title}` : ""}`;
+                const reviewedBy = request.handled_by_name
+                    ? `${request.handled_by_name}${request.handled_by_email ? ` · ${request.handled_by_email}` : ""}`
+                    : "—";
+                return `
+                    <tr>
+                        <td><strong>${escapeAdminHtml(request.student_name || "Student")}</strong></td>
+                        <td>${escapeAdminHtml(request.student_email || "—")}</td>
+                        <td>${escapeAdminHtml(examSet)}</td>
+                        <td>${escapeAdminHtml(formatPaymentHistoryDate(request.requested_at))}</td>
+                        <td><span class="payment-status ${statusClass}">${escapeAdminHtml(status)}</span></td>
+                        <td>${escapeAdminHtml(formatPaymentHistoryDate(request.handled_at))}</td>
+                        <td>${escapeAdminHtml(reviewedBy)}</td>
+                    </tr>
+                `;
+            }).join("");
+        } catch (error) {
+            console.error("Unable to load set request history:", error);
+            if (paymentHistoryFeedback) paymentHistoryFeedback.textContent = error.message || "Could not load set request history.";
+        } finally {
+            if (refreshPaymentHistory) refreshPaymentHistory.disabled = false;
+        }
+    }
+
+    refreshPaymentHistory?.addEventListener("click", loadPaymentHistory);
 
     async function loadSetRequestNotifications() {
         if (!notificationsList) return;
@@ -249,6 +325,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(data.detail || "Could not update this request.");
                 await loadSetRequestNotifications();
+                if (document.getElementById("payments")?.classList.contains("active")) {
+                    await loadPaymentHistory();
+                }
             } catch (error) {
                 console.error("Set request action failed:", error);
                 button.disabled = false;
@@ -3715,6 +3794,9 @@ document.addEventListener(
                 if (sectionName === "inquiries") {
                     loadAdminInquiries();
                 }
+                if (sectionName === "payments") {
+                    loadPaymentHistory();
+                }
 
             }
         );
@@ -3881,6 +3963,9 @@ document.addEventListener(
 
         if (hash === "inquiries") {
             loadAdminInquiries();
+        }
+        if (hash === "payments") {
+            loadPaymentHistory();
         }
 
     }

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.database.database import get_db
 from app.admin_portal.models.user import User
@@ -66,6 +66,65 @@ def get_pending_set_purchase_requests(
                 "exam_set_title": row["exam_set_title"],
                 "requested_at": row["requested_at"].isoformat() if row["requested_at"] else None,
                 "status": "Pending payment review",
+            }
+            for row in records
+        ],
+    }
+
+
+@router.get("/requests/history")
+def get_set_purchase_request_history(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """List all set purchase requests with their admin decisions."""
+    admin_user = aliased(User)
+    records = db.execute(
+        select(
+            StudentSetPurchaseRequest.id,
+            StudentSetPurchaseRequest.student_id,
+            StudentSetPurchaseRequest.exam_set_id,
+            StudentSetPurchaseRequest.status,
+            StudentSetPurchaseRequest.requested_at,
+            StudentSetPurchaseRequest.handled_at,
+            User.name.label("student_name"),
+            User.email.label("student_email"),
+            Exam.title.label("exam_title"),
+            ExamSet.set_number,
+            ExamSet.set_name.label("exam_set_title"),
+            admin_user.name.label("handled_by_name"),
+            admin_user.email.label("handled_by_email"),
+        )
+        .join(User, User.id == StudentSetPurchaseRequest.student_id)
+        .join(ExamSet, ExamSet.id == StudentSetPurchaseRequest.exam_set_id)
+        .join(Exam, Exam.id == ExamSet.exam_id)
+        .outerjoin(admin_user, admin_user.id == StudentSetPurchaseRequest.handled_by)
+        .where(User.role.ilike("student"))
+        .order_by(StudentSetPurchaseRequest.requested_at.desc(), StudentSetPurchaseRequest.id.desc())
+    ).mappings().all()
+
+    status_labels = {
+        "PENDING": "Pending",
+        "UNLOCKED": "Approved",
+        "REJECTED": "Rejected",
+    }
+    return {
+        "total": len(records),
+        "requests": [
+            {
+                "request_id": row["id"],
+                "student_id": row["student_id"],
+                "student_name": row["student_name"],
+                "student_email": row["student_email"],
+                "exam_set_id": row["exam_set_id"],
+                "exam_title": row["exam_title"],
+                "set_number": row["set_number"],
+                "exam_set_title": row["exam_set_title"],
+                "status": status_labels.get(row["status"], row["status"].title()),
+                "requested_at": row["requested_at"].isoformat() if row["requested_at"] else None,
+                "handled_at": row["handled_at"].isoformat() if row["handled_at"] else None,
+                "handled_by_name": row["handled_by_name"],
+                "handled_by_email": row["handled_by_email"],
             }
             for row in records
         ],

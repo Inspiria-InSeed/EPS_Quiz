@@ -51,25 +51,21 @@ def request_paid_set_access(
             detail="You already have access to one or more selected sets. Refresh the set list and try again.",
         )
 
-    existing_requests = {
-        item.exam_set_id: item
-        for item in db.scalars(select(StudentSetPurchaseRequest).where(
-            StudentSetPurchaseRequest.student_id == current_user_id,
-            StudentSetPurchaseRequest.exam_set_id.in_(requested_ids),
-        )).all()
-    }
+    pending_set_ids = set(
+        db.scalars(
+            select(StudentSetPurchaseRequest.exam_set_id).where(
+                StudentSetPurchaseRequest.student_id == current_user_id,
+                StudentSetPurchaseRequest.exam_set_id.in_(requested_ids),
+                StudentSetPurchaseRequest.status == "PENDING",
+            )
+        ).all()
+    )
     for exam_set in exam_sets:
-        existing = existing_requests.get(exam_set.id)
-        if existing is None:
+        if exam_set.id not in pending_set_ids:
             db.add(StudentSetPurchaseRequest(
                 student_id=current_user_id,
                 exam_set_id=exam_set.id,
             ))
-        elif existing.status != "PENDING":
-            existing.status = "PENDING"
-            existing.requested_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            existing.handled_by = None
-            existing.handled_at = None
 
     db.commit()
     return {

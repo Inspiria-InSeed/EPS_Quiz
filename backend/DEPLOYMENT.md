@@ -48,6 +48,12 @@ For student set purchase requests and admin set unlocks, apply
 [`migrations/2026_10_student_set_access_requests.sql`](migrations/2026_10_student_set_access_requests.sql)
 to the production database before using checkout or the admin access controls.
 
+To keep a full history when a student submits the same set request again, apply
+[`migrations/2026_10_set_purchase_request_history.sql`](migrations/2026_10_set_purchase_request_history.sql)
+to the same database. It removes the per-student/set uniqueness constraint and
+adds an index for querying that history; existing request and decision rows are
+preserved.
+
 For student profile photo uploads, apply
 [`migrations/2026_10_student_profile_photo.sql`](migrations/2026_10_student_profile_photo.sql)
 before deploying the profile API changes. Profile images use the existing private
