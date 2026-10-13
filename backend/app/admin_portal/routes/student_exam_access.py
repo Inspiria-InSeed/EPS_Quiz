@@ -101,7 +101,7 @@ def unlock_exam_sets(
         "total_newly_unlocked": len(new_records),
     }
 
-@router.delete("/{student_id}/{exam_set_id}")
+@router.delete("/{student_id:int}/{exam_set_id:int}")
 def lock_exam_set(
     student_id: int,
     exam_set_id: int,
