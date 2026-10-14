@@ -214,11 +214,23 @@ def _validate_registration_email(email: str) -> str:
             detail="We could not verify this email right now. Please try again shortly.",
         )
 
-    if str(result.get("status", "")).strip().lower() != "valid":
+    mailbox_status = str(result.get("status", "")).strip().lower()
+    if mailbox_status in {"invalid", "spamtrap", "abuse", "do_not_mail"}:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Invalid email address. Please enter a working email address that you can access.",
         )
+
+    if mailbox_status not in {"valid", "catch-all", "unknown"}:
+        logger.warning("Registration mailbox validation returned an unsupported status")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="We could not verify this email right now. Please try again shortly.",
+        )
+
+    # Catch-all and unknown are inconclusive, not proof that the address is
+    # invalid. The registration OTP sent below verifies that the user can
+    # actually receive mail at this address before an account is created.
 
     return validated.normalized
 
