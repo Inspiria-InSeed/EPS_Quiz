@@ -161,7 +161,13 @@ class ResetPasswordRequest(BaseModel):
 
 
 def _validate_registration_email(email: str) -> str:
-    """Validate syntax, mail domain, and mailbox before any registration OTP is sent."""
+    """Validate address syntax and reject mailboxes explicitly flagged as unsafe.
+
+    ZeroBounce is an additional reputation check, but it must not prevent a
+    user from registering when that external service is unavailable. The OTP
+    flow below is the actual proof that the user can receive mail at this
+    address.
+    """
     try:
         validated = validate_email(
             email,
@@ -179,11 +185,8 @@ def _validate_registration_email(email: str) -> str:
 
     api_key = settings.ZEROBOUNCE_API_KEY
     if not api_key:
-        logger.error("Registration blocked because mailbox validation is not configured")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Email verification is temporarily unavailable. Please try again later.",
-        )
+        logger.warning("ZeroBounce is not configured; registration will rely on email OTP")
+        return validated.normalized
 
     try:
         response = httpx.post(
@@ -198,21 +201,15 @@ def _validate_registration_email(email: str) -> str:
         )
         result = response.json()
     except (httpx.HTTPError, ValueError):
-        logger.warning("Registration mailbox validation service is unavailable")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="We could not verify this email right now. Please try again shortly.",
-        ) from None
+        logger.warning("ZeroBounce is unavailable; registration will rely on email OTP")
+        return validated.normalized
 
     if response.status_code != 200 or not isinstance(result, dict) or result.get("error"):
         logger.warning(
-            "Registration mailbox validation failed with status %s",
+            "ZeroBounce returned an unusable response (HTTP %s); registration will rely on email OTP",
             response.status_code,
         )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="We could not verify this email right now. Please try again shortly.",
-        )
+        return validated.normalized
 
     mailbox_status = str(result.get("status", "")).strip().lower()
     if mailbox_status in {"invalid", "spamtrap", "abuse", "do_not_mail"}:
@@ -222,11 +219,7 @@ def _validate_registration_email(email: str) -> str:
         )
 
     if mailbox_status not in {"valid", "catch-all", "unknown"}:
-        logger.warning("Registration mailbox validation returned an unsupported status")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="We could not verify this email right now. Please try again shortly.",
-        )
+        logger.warning("ZeroBounce returned an unrecognized status; registration will rely on email OTP")
 
     # Catch-all and unknown are inconclusive, not proof that the address is
     # invalid. The registration OTP sent below verifies that the user can
